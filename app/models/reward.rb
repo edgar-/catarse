@@ -1,5 +1,6 @@
 # coding: utf-8
 class Reward < ActiveRecord::Base
+  include I18n::Alchemy
   include RankedModel
   include ERB::Util
 
@@ -25,7 +26,8 @@ class Reward < ActiveRecord::Base
                                       FROM
                                         contributions c JOIN payments p ON p.contribution_id = c.id
                                       WHERE
-                                        p.state IN ('paid', 'pending')
+                                        (p.state = 'paid' OR
+                                        p.waiting_payment)
                                         AND reward_id = rewards.id
                                     ) < maximum_contributions)") }
   scope :sort_asc, -> { order('id ASC') }
@@ -37,7 +39,7 @@ class Reward < ActiveRecord::Base
   after_save :expires_project_cache
 
   def deliver_at_cannot_be_in_the_past
-    self.errors.add(:deliver_at, "Previsão de entrega deve ser superior a data em que o projeto entra no ar") if
+    self.errors.add(:deliver_at, "Previsão de entrega deve ser superior a data em que o projeto termina") if
       self.project.expires_at.present? ? self.deliver_at < self.project.expires_at.beginning_of_month : self.deliver_at < Time.current.beginning_of_month
   end
 
@@ -54,7 +56,8 @@ class Reward < ActiveRecord::Base
   end
 
   def sold_out?
-    maximum_contributions && total_compromised >= maximum_contributions
+    #maximum_contributions && total_compromised >= maximum_contributions
+    pluck_from_database('sold_out')
   end
 
   def any_sold?
@@ -66,7 +69,15 @@ class Reward < ActiveRecord::Base
   end
 
   def total_compromised
-    total_contributions %w(paid pending)
+    paid_count + in_time_to_confirm
+  end
+
+  def paid_count
+    pluck_from_database('paid_count')
+  end
+
+  def in_time_to_confirm
+    pluck_from_database('waiting_payment_count')
   end
 
   def remaining
@@ -83,5 +94,10 @@ class Reward < ActiveRecord::Base
 
   def expires_project_cache
     project.expires_fragments 'project-rewards'
+  end
+
+  private
+  def pluck_from_database attribute
+    Reward.where(id: self.id).pluck("rewards.#{attribute}").first
   end
 end

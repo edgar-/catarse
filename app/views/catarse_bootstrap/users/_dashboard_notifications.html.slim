@@ -33,6 +33,7 @@
                 .w-col.w-col-4
                   .fontweight-semibold.fontsize-small.u-marginbottom-10 Categorias que você segue:
                 .w-col.w-col-8
+                  = hidden_field_tag "category_followers_form", 'true'
                   - @user.category_followers.all.each do |category_follower|
                     .w-checkbox.w-clearfix
                       = check_box_tag "user[category_followers_attributes][][category_id]", category_follower.category.id, true, class: 'w-checkbox-input'
@@ -42,10 +43,12 @@
                 .w-col.w-col-4
                   .fontweight-semibold.fontsize-small.u-marginbottom-10 Lembretes de projetos:
                 .w-col.w-col-8
-                  - @user.projects_in_reminder.each do |project|
+                  - @user.reminders.without_notification.each do |reminder|
+                    - project = reminder.project
                     .w-checkbox.w-clearfix
-                      = check_box_tag "user[reminders][][project_id]", project.id, true, class: 'w-checkbox-input'
-                      label.w-form-label.fontsize-small for="checkbox-14"= project.name
+                      = hidden_field_tag "user[reminders][#{project.id}]", false
+                      = check_box_tag "user[reminders][#{project.id}]", "1", true, class: 'w-checkbox-input'
+                      label.w-form-label.fontsize-small= project.name
       .u-margintop-30
         .w-container
           .w-row
